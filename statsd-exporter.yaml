@@ -1,0 +1,83 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: statsd-exporter
+  namespace: velero
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: statsd-exporter
+    spec:
+      containers:
+      - name: statsd-exporter
+        image: prom/statsd-exporter
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9102
+        - containerPort: 9125
+        args:
+          - --log.level=debug
+          - --statsd.mapping-config=/etc/statsd_mapping.conf
+        volumeMounts:
+        - name: statsd-mapping
+          mountPath: /etc/statsd_mapping.conf
+          subPath: statsd_mapping.conf
+      - name: velero-exporter
+        args:
+        - "10"
+        command:
+          - "/bin/statsd-get.sh"
+        env:
+          - name: STATSD_HOST
+            value: "statsd-exporter-svc"
+          - name: STATSD_PORT
+            value: "8125"
+        image: gcr.io/heptio-images/velero:v1.1.0
+        imagePullPolicy: IfNotPresent
+        name: velero-exporter
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - name: statsd-get
+          mountPath: /bin/statsd-get.sh
+          subPath: statsd-get.sh
+        - name: statsd-client
+          mountPath: /bin/statsd-client.sh
+          subPath: statsd-client.sh
+      serviceAccount: velero-server
+      serviceAccountName: velero-server
+      volumes:
+      - name: statsd-get
+        configMap:
+          name: statsd-get
+          defaultMode: 0777
+      - name: statsd-client
+        configMap:
+          name: statsd-client
+          defaultMode: 0777
+      - name: statsd-mapping
+        configMap:
+          name: statsd-mapping
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: statsd-exporter-svc
+  namespace: velero
+  labels:
+    app: statsd-exporter
+spec:
+  ports:
+  - name: udp
+    port: 8125 #port to push metrics to
+    protocol: UDP
+    targetPort: 9125
+  - name: tcp
+    port: 9102 #port to fetch metrics from
+    protocol: TCP
+    targetPort: 9102
+  selector:
+    app: statsd-exporter

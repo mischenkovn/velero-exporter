@@ -1,0 +1,18 @@
+apiVersion: v1
+data:
+  statsd-get.sh: |
+    #!/bin/sh
+    while (sleep ${1});
+    do
+      for schedule in $(/velero schedule get| grep Enabled | awk '{print $1}');
+      do
+        echo ${schedule};
+        COUNT=0;
+        COUNT=$(/velero backup get -l velero.io/schedule-name=${schedule}| grep -v NAME | wc -l);
+        statsd-client.sh  "velero.backup.active.total.${schedule}:${COUNT}|g";
+      done;
+    done
+kind: ConfigMap
+metadata:
+  name: statsd-get
+  namespace: velero
