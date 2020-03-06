@@ -10,7 +10,6 @@ kind: ConfigMap
 metadata:
   name: statsd-mapping
   namespace: velero
-(local_test) [root@optibet backup]# cat servicemonitors_exporter.yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
